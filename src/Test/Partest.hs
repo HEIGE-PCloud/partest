@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Test.Partest where
 
 import Data.Graph
@@ -119,13 +121,19 @@ filter' f (x : xs)
   <recursiveTerm> ::= <recursiveTerm1> | <recursiveTerm2>
 -}
 
-data Expr = Term String | Sym Symbol | Seqs [Expr] | Choices [Expr]
-  deriving (Show, Eq)
+data ExprS = STerm String | SSym Symbol
+  deriving (Show, Ord, Eq)
+
+data ExprC = CSeqs [ExprS] | CTerm String | CSym Symbol
+  deriving (Show, Ord, Eq)
+
+data Expr = Choices [ExprC] | Seqs [ExprS] | Sym Symbol | Term String
+  deriving (Show, Ord, Eq)
 
 type Symbol = String
 
 data Rule = Rule Symbol Expr
-  deriving (Show, Eq)
+  deriving (Show, Ord, Eq)
 
 singleTerm = Rule "singleTerm" (Term "singleTerm")
 
@@ -133,22 +141,62 @@ seqTerm1 = Rule "seqTerm1" (Term "seqTerm1")
 
 seqTerm2 = Rule "seqTerm2" (Term "seqTerm2")
 
-seqTerm = Rule "seqTerm" $ Seqs [Sym "seqTerm1", Sym "seqTerm2"]
+seqTerm = Rule "seqTerm" $ Seqs [SSym "seqTerm1", SSym "seqTerm2"]
 
 choicesTerm1 = Rule "choicesTerm1" (Term "choicesTerm1")
 
 choicesTerm2 = Rule "choicesTerm2" (Term "choicesTerm2")
 
-choicesTerm = Rule "choicesTerm" $ Choices [Sym "choicesTerm1", Sym "choicesTerm2"]
+choicesTerm = Rule "choicesTerm" $ Choices [CSym "choicesTerm1", CSym "choicesTerm2"]
 
-recursiveTerm1 = Rule "recursiveTerm1" (Choices [Sym "recursiveTerm", Term "recursiveTerm1"])
+recursiveTerm1 = Rule "recursiveTerm1" (Choices [CSym "recursiveTerm", CTerm "recursiveTerm1"])
 
-recursiveTerm2 = Rule "recursiveTerm2" (Choices [Sym "recursiveTerm", Term "recursiveTerm2"])
+recursiveTerm2 = Rule "recursiveTerm2" (Choices [CSym "recursiveTerm", CTerm "recursiveTerm2"])
 
-recursiveTerm = Rule "recursiveTerm" $ Choices [Sym "recursiveTerm1", Sym "recursiveTerm2"]
+recursiveTerm = Rule "recursiveTerm" $ Choices [CSym "recursiveTerm1", CSym "recursiveTerm2"]
 
 compile :: [Rule] -> [(BNF, Integer, [Integer])]
-compile = undefined
+compile rs = zip3 bs is es
+  where
+    m = assignIds rs
+    bs :: [BNF] = map compileExpr rs
+    es :: [[Integer]] = map (`compileEdge` m) rs
+    is :: [Integer] = map (`compileId` m) rs
+
+inverseMap :: [(BNF, Integer, [Integer])] -> Map Integer BNF'
+inverseMap = fromList . map (\(b, i, xs) -> (i, (b, i, xs)))
+
+
+assignIds :: [Rule] -> Map Symbol Integer
+assignIds rs = fromList $ zip (map symbol rs) [0 ..]
+
+symbol :: Rule -> Symbol
+symbol (Rule s _) = s
+
+compileExpr :: Rule -> BNF
+compileExpr (Rule expr _) = undefined
+
+compileEdge :: Rule -> Map Symbol Integer -> [Integer]
+compileEdge (Rule _ expr) m = map (m !) (flattenExpr expr)
+
+flattenExpr :: Expr -> [Symbol]
+flattenExpr (Term _) = []
+flattenExpr (Sym s) = [s]
+flattenExpr (Seqs ss) = concatMap flattenExprS ss
+flattenExpr (Choices cs) = concatMap flattenExprC cs
+
+flattenExprS :: ExprS -> [Symbol]
+flattenExprS (STerm _) = []
+flattenExprS (SSym s) = [s]
+
+flattenExprC :: ExprC -> [Symbol]
+flattenExprC (CTerm _) = []
+flattenExprC (CSym s) = [s]
+flattenExprC (CSeqs ss) = concatMap flattenExprS ss
+
+
+compileId :: Rule -> Map Symbol Integer -> Integer
+compileId (Rule s _) m = m ! s
 
 newtype FTerm = FTerm String
 
