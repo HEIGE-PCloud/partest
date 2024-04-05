@@ -3,7 +3,14 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    hackage: gigaparsec-0.2.5.1@sha256:79f0eb1e2d0d4c902a163e18e42a3439a2e79528424b02b553106a3219f21152,9168
+    pantry-tree:
+      sha256: 3126d1da852a485e32f4053465e22683ac865caf60726928727598d078764a64
+      size: 4834
+  original:
+    hackage: gigaparsec-0.2.5.1
 snapshots:
 - completed:
     sha256: 6f0bea3ba5b07360f25bc886e8cff8d847767557a492a6f7f6dcb06e3cc79ee9
