@@ -121,10 +121,10 @@ filter' f (x : xs)
   <recursiveTerm> ::= <recursiveTerm1> | <recursiveTerm2>
 -}
 
-data ExprS = STerm String | SSym Symbol
+newtype Sym = Sym Symbol
   deriving (Show, Ord, Eq)
 
-data Expr = Choices [ExprS] | Seqs [ExprS] | Sym Symbol | Term String
+data Expr = Choices [Sym] | Seqs [Sym] | Term String
   deriving (Show, Ord, Eq)
 
 type Symbol = String
@@ -132,25 +132,30 @@ type Symbol = String
 data Rule = Rule Symbol Expr
   deriving (Show, Ord, Eq)
 
-singleTerm = Rule "singleTerm" (Term "singleTerm")
+singleTerm = Rule "singleTerm" (Term "[singleTerm]")
 
-seqTerm1 = Rule "seqTerm1" (Term "seqTerm1")
+seqTerm1 = Rule "seqTerm1" (Term "[seqTerm1]")
 
-seqTerm2 = Rule "seqTerm2" (Term "seqTerm2")
+seqTerm2 = Rule "seqTerm2" (Term "[seqTerm2]")
 
-seqTerm = Rule "seqTerm" $ Seqs [SSym "seqTerm1", SSym "seqTerm2"]
+seqTerm = Rule "seqTerm" $ Seqs [Sym "seqTerm1", Sym "seqTerm2"]
 
-choicesTerm1 = Rule "choicesTerm1" (Term "choicesTerm1")
+choicesTerm1 = Rule "choicesTerm1" (Term "[choicesTerm1]")
 
-choicesTerm2 = Rule "choicesTerm2" (Term "choicesTerm2")
+choicesTerm2 = Rule "choicesTerm2" (Term "[choicesTerm2]")
 
-choicesTerm = Rule "choicesTerm" $ Choices [SSym "choicesTerm1", SSym "choicesTerm2"]
+choicesTerm = Rule "choicesTerm" $ Choices [Sym "choicesTerm1", Sym "choicesTerm2"]
 
-recursiveTerm1 = Rule "recursiveTerm1" (Choices [SSym "recursiveTerm", STerm "recursiveTerm1"])
+recursiveTerm1' = Rule "recursiveTerm1'" (Term "[recursiveTerm1]")
 
-recursiveTerm2 = Rule "recursiveTerm2" (Choices [SSym "recursiveTerm", STerm "recursiveTerm2"])
+recursiveTerm2' = Rule "recursiveTerm2'" (Term "[recursiveTerm2]")
 
-recursiveTerm = Rule "recursiveTerm" $ Choices [SSym "recursiveTerm1", SSym "recursiveTerm2"]
+recursiveTerm = Rule "recursiveTerm" $ Choices [Sym "recursiveTerm1", Sym "recursiveTerm2"]
+
+recursiveTerm1 = Rule "recursiveTerm1" (Choices [Sym "recursiveTerm", Sym "recursiveTerm1'"])
+
+recursiveTerm2 = Rule "recursiveTerm2" (Choices [Sym "recursiveTerm", Sym "recursiveTerm2'"])
+
 
 compile :: [Rule] -> [(BNF, Integer, [Integer])]
 compile rs = zip3 bs is es
@@ -163,7 +168,6 @@ compile rs = zip3 bs is es
 inverseMap :: [(BNF, Integer, [Integer])] -> Map Integer BNF'
 inverseMap = fromList . map (\(b, i, xs) -> (i, (b, i, xs)))
 
-
 assignIds :: [Rule] -> Map Symbol Integer
 assignIds rs = fromList $ zip (map symbol rs) [0 ..]
 
@@ -171,21 +175,20 @@ symbol :: Rule -> Symbol
 symbol (Rule s _) = s
 
 compileExpr :: Rule -> BNF
-compileExpr (Rule expr _) = undefined
+compileExpr (Rule _ (Choices _)) = BChoices
+compileExpr (Rule _ (Seqs _)) = BSeqs
+compileExpr (Rule _ (Term s)) = BTerm s
 
 compileEdge :: Rule -> Map Symbol Integer -> [Integer]
 compileEdge (Rule _ expr) m = map (m !) (flattenExpr expr)
 
 flattenExpr :: Expr -> [Symbol]
-flattenExpr (Term _) = []
-flattenExpr (Sym s) = [s]
-flattenExpr (Seqs ss) = concatMap flattenExprS ss
-flattenExpr (Choices cs) = concatMap flattenExprS cs
+flattenExpr (Seqs ss) = map flattenSym ss
+flattenExpr (Choices cs) = map flattenSym cs
+flattenExpr (Term s) = []
 
-flattenExprS :: ExprS -> [Symbol]
-flattenExprS (STerm _) = []
-flattenExprS (SSym s) = [s]
-
+flattenSym :: Sym -> Symbol
+flattenSym (Sym s) = s
 
 compileId :: Rule -> Map Symbol Integer -> Integer
 compileId (Rule s _) m = m ! s
@@ -229,3 +232,24 @@ gen' bs i = do
   gen j ms i
 
 g' x = sample $ gen' es x
+
+rules :: [Rule]
+rules =
+  [ singleTerm
+  , seqTerm1
+  , seqTerm2
+  , seqTerm
+  , choicesTerm1
+  , choicesTerm2
+  , choicesTerm
+  , recursiveTerm1'
+  , recursiveTerm2'
+  , recursiveTerm
+  , recursiveTerm1
+  , recursiveTerm2
+  ]
+
+es' = compile rules
+
+ms' = inverseMap es'
+
