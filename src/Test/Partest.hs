@@ -163,29 +163,29 @@ instance Show FSeq where
 concatF :: [FSeq] -> FSeq
 concatF = FSeq . concatMap (\(FSeq fs) -> fs)
 
-gen :: BNF' -> Int -> Gen FSeq
-gen (BTerm s, _, _) _ = return $ FSeq [FTerm s]
-gen (BSeqs, x, xs) i = do
-  fs <- mapM (\x' -> gen (ms ! x') (i - 1)) xs
+gen :: BNF' -> Map Integer BNF' -> Int -> Gen FSeq
+gen (BTerm s, _, _) _ _ = return $ FSeq [FTerm s]
+gen (BSeqs, x, xs) m i = do
+  fs <- mapM (\x' -> gen (m ! x') m (i - 1)) xs
   return $ concatF fs
-gen (BChoices, x, xs) i
+gen (BChoices, x, xs) m i
   | i < 1 = do
     let ts = filter isTerminal' xs
     case ts of 
       [] -> do
         t <- elements xs
-        gen (ms ! t) (i - 1)
+        gen (m ! t) m (i - 1)
       _ -> do
         t <- elements ts
-        gen (ms ! t) (i - 1)
+        gen (m ! t) m (i - 1)
 
   | otherwise = do
     j <- elements xs
-    gen (ms ! j) (i - 1)
+    gen (m ! j) m (i - 1)
 
 gen' :: [BNF'] -> Int -> Gen FSeq
 gen' bs i = do
   j <- elements bs
-  gen j i
+  gen j ms i
 
 g' x = sample $ gen' es x
