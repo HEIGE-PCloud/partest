@@ -97,36 +97,27 @@ filter' f (x : xs)
   <recursiveTerm> ::= <recursiveTerm1> | <recursiveTerm2>
 -}
 
+data Expr = Term String | Sym String | Seqs [Expr] | Choices [Expr]
+  deriving (Show, Eq)
 
+type Symbol = String
 
--- BRule "singleTerm" = BTerm "singleTerm"
--- BRule "seqTerm1" = BTerm "seqTerm1"
--- BRule "seqTerm2" = BTerm "seqTerm2"
--- BRule "seqTerm" = BSeqs [BRule "seqTerm1", BRule "seqTerm2"]
--- BRule "choicesTerm1" = BTerm "choicesTerm1"
--- BRule "choicesTerm2" = BTerm "choicesTerm2"
--- BRule "choicesTerm" = BChoices [BRule "choicesTerm1", BRule "choicesTerm2"]
--- BRule "recursiveTerm1" = BChoices [BRule "recursiveTerm", BTerm "recursiveTerm1"]
--- BRule "recursiveTerm2" = BChoices [BRule "recursiveTerm", BTerm "recursiveTerm2"]
--- BRule "recursiveTerm" = BChoices [BRule "recursiveTerm1", BRule "recursiveTerm2"]
+data Rule = Rule Symbol Expr
+  deriving (Show, Eq)
 
+singleTerm = Rule "singleTerm" (Term "singleTerm")
+seqTerm1 = Rule "seqTerm1" (Term "seqTerm1")
+seqTerm2 = Rule "seqTerm2" (Term "seqTerm2")
+seqTerm = Rule "seqTerm" $ Seqs [Sym "seqTerm1", Sym "seqTerm2"]
+choicesTerm1 = Rule "choicesTerm1" (Term "choicesTerm1")
+choicesTerm2 = Rule "choicesTerm2" (Term "choicesTerm2")
+choicesTerm = Rule "choicesTerm" $ Choices [Sym "choicesTerm1", Sym "choicesTerm2"]
+recursiveTerm1 = Rule "recursiveTerm1" (Choices [Sym "recursiveTerm", Term "recursiveTerm1"])
+recursiveTerm2 = Rule "recursiveTerm2" (Choices [Sym "recursiveTerm", Term "recursiveTerm2"])
+recursiveTerm = Rule "recursiveTerm" $ Choices [Sym "recursiveTerm1", Sym "recursiveTerm2"]
 
--- bType :: BNF
--- bType = BChoices [baseType, arrayType, pairType]
-
--- baseType :: BNF
--- baseType = BChoices [BTerm "int", BTerm "bool", BTerm "char", BTerm "string"]
-
--- arrayType :: BNF
--- arrayType = BSeqs [bType, BTerm "[", BTerm "]"]
-
--- pairType :: BNF
--- pairType =
---   BSeqs
---     [BTerm "pair", BTerm "(", pairElemType, BTerm ",", pairElemType, BTerm ")"]
-
--- pairElemType :: BNF
--- pairElemType = BChoices [baseType, arrayType, BTerm "pair"]
+compile :: [Rule] -> [(BNF, Integer, [Integer])]
+compile = undefined
 
 newtype FTerm = FTerm String
 
