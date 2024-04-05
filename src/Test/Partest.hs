@@ -124,10 +124,7 @@ filter' f (x : xs)
 data ExprS = STerm String | SSym Symbol
   deriving (Show, Ord, Eq)
 
-data ExprC = CSeqs [ExprS] | CTerm String | CSym Symbol
-  deriving (Show, Ord, Eq)
-
-data Expr = Choices [ExprC] | Seqs [ExprS] | Sym Symbol | Term String
+data Expr = Choices [ExprS] | Seqs [ExprS] | Sym Symbol | Term String
   deriving (Show, Ord, Eq)
 
 type Symbol = String
@@ -147,13 +144,13 @@ choicesTerm1 = Rule "choicesTerm1" (Term "choicesTerm1")
 
 choicesTerm2 = Rule "choicesTerm2" (Term "choicesTerm2")
 
-choicesTerm = Rule "choicesTerm" $ Choices [CSym "choicesTerm1", CSym "choicesTerm2"]
+choicesTerm = Rule "choicesTerm" $ Choices [SSym "choicesTerm1", SSym "choicesTerm2"]
 
-recursiveTerm1 = Rule "recursiveTerm1" (Choices [CSym "recursiveTerm", CTerm "recursiveTerm1"])
+recursiveTerm1 = Rule "recursiveTerm1" (Choices [SSym "recursiveTerm", STerm "recursiveTerm1"])
 
-recursiveTerm2 = Rule "recursiveTerm2" (Choices [CSym "recursiveTerm", CTerm "recursiveTerm2"])
+recursiveTerm2 = Rule "recursiveTerm2" (Choices [SSym "recursiveTerm", STerm "recursiveTerm2"])
 
-recursiveTerm = Rule "recursiveTerm" $ Choices [CSym "recursiveTerm1", CSym "recursiveTerm2"]
+recursiveTerm = Rule "recursiveTerm" $ Choices [SSym "recursiveTerm1", SSym "recursiveTerm2"]
 
 compile :: [Rule] -> [(BNF, Integer, [Integer])]
 compile rs = zip3 bs is es
@@ -183,16 +180,11 @@ flattenExpr :: Expr -> [Symbol]
 flattenExpr (Term _) = []
 flattenExpr (Sym s) = [s]
 flattenExpr (Seqs ss) = concatMap flattenExprS ss
-flattenExpr (Choices cs) = concatMap flattenExprC cs
+flattenExpr (Choices cs) = concatMap flattenExprS cs
 
 flattenExprS :: ExprS -> [Symbol]
 flattenExprS (STerm _) = []
 flattenExprS (SSym s) = [s]
-
-flattenExprC :: ExprC -> [Symbol]
-flattenExprC (CTerm _) = []
-flattenExprC (CSym s) = [s]
-flattenExprC (CSeqs ss) = concatMap flattenExprS ss
 
 
 compileId :: Rule -> Map Symbol Integer -> Integer
