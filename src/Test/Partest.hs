@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Test.Partest where
 
@@ -9,7 +10,7 @@ import Data.Maybe (fromJust)
 import Data.Tree (flatten)
 import Test.QuickCheck
 
-data BNF = BChoices | BSeqs | BTerm String
+data BNF = BChoices Sym | BSeqs Sym | BTerm String Sym
   deriving (Show, Eq)
 
 -- singleTerm = BTerm "singleTerm"
@@ -25,43 +26,38 @@ data BNF = BChoices | BSeqs | BTerm String
 
 type BNF' = (BNF, Integer, [Integer])
 
-bterm :: String -> Integer -> BNF'
-bterm s x = (BTerm s, x, [])
-
-bsqes :: [BNF'] -> BNF'
-bsqes bs = (BSeqs, 0, map (\(b, _, _) -> 0) bs)
 
 es :: [BNF']
 es =
-  [ (BTerm "[singleTerm]", 0, [])
-  , (BTerm "[seqTerm1]", 1, [])
-  , (BTerm "[seqTerm2]", 2, [])
-  , (BSeqs, 3, [1, 2])
-  , (BTerm "[choicesTerm1]", 4, [])
-  , (BTerm "[choicesTerm2]", 5, [])
-  , (BChoices, 6, [4, 5])
-  , (BTerm "[recursiveTerm1]", 7, [])
-  , (BTerm "[recursiveTerm2]", 8, [])
-  , (BChoices, 9, [10, 11])
-  , (BChoices, 10, [9, 7])
-  , (BChoices, 11, [9, 8])
+  [ (BTerm "[singleTerm]" (Sym "singleTerm"), 0, [])
+  , (BTerm "[seqTerm1]" (Sym "seqTerm1"), 1, [])
+  , (BTerm "[seqTerm2]" (Sym "seqTerm2"), 2, [])
+  , (BSeqs (Sym "seqTerm"), 3, [1, 2])
+  , (BTerm "[choicesTerm1]" (Sym "choicesTerm1"), 4, [])
+  , (BTerm "[choicesTerm2]" (Sym "choicesTerm2"), 5, [])
+  , (BChoices (Sym "choicesTerm"), 6, [4, 5])
+  , (BTerm "[recursiveTerm1]" (Sym "recursiveTerm1'"), 7, [])
+  , (BTerm "[recursiveTerm2]" (Sym "recursiveTerm2'"), 8, [])
+  , (BChoices (Sym "recursiveTerm"), 9, [10, 11])
+  , (BChoices (Sym "recursiveTerm1"), 10, [9, 7])
+  , (BChoices (Sym "recursiveTerm2"), 11, [9, 8])
   ]
 
 ms :: Map Integer BNF'
 ms =
   fromList
-    [ (0, (BTerm "[singleTerm]", 0, []))
-    , (1, (BTerm "[seqTerm1]", 1, []))
-    , (2, (BTerm "[seqTerm2]", 2, []))
-    , (3, (BSeqs, 3, [1, 2]))
-    , (4, (BTerm "[choicesTerm1]", 4, []))
-    , (5, (BTerm "[choicesTerm2]", 5, []))
-    , (6, (BChoices, 6, [4, 5]))
-    , (7, (BTerm "[recursiveTerm1]", 7, []))
-    , (8, (BTerm "[recursiveTerm2]", 8, []))
-    , (9, (BChoices, 9, [10, 11]))
-    , (10, (BChoices, 10, [9, 7]))
-    , (11, (BChoices, 11, [9, 8]))
+    [ (0, (BTerm "[singleTerm]" (Sym "singleTerm"), 0, []))
+    , (1, (BTerm "[seqTerm1]" (Sym "seqTerm1"), 1, []))
+    , (2, (BTerm "[seqTerm2]" (Sym "seqTerm2"), 2, []))
+    , (3, (BSeqs (Sym "seqTerm"), 3, [1, 2]))
+    , (4, (BTerm "[choicesTerm1]" (Sym "choicesTerm1"), 4, []))
+    , (5, (BTerm "[choicesTerm2]" (Sym "choicesTerm2"), 5, []))
+    , (6, (BChoices (Sym "choicesTerm"), 6, [4, 5]))
+    , (7, (BTerm "[recursiveTerm1]" (Sym "recursiveTerm1'"), 7, []))
+    , (8, (BTerm "[recursiveTerm2]" (Sym "recursiveTerm2'"), 8, []))
+    , (9, (BChoices (Sym "recursiveTerm"), 9, [10, 11]))
+    , (10, (BChoices (Sym "recursiveTerm1"), 10, [9, 7]))
+    , (11, (BChoices (Sym "recursiveTerm2"), 11, [9, 8]))
     ]
 
 graph :: Graph
@@ -77,8 +73,11 @@ isTerminal x = any (path graph v) (reachable graph v \\ [v])
     v = fromJust $ vertexFromKey x
 
 
+r1 :: [Tree Vertex]
 r1 = scc graph
+r2 :: [SCC BNF]
 
+r3 :: [Vertex]
 r2 = stronglyConnComp es
 
 r3 = flatten $ head r1
@@ -91,11 +90,14 @@ ts :: [[Vertex]]
 nts :: [[Vertex]]
 (ts, nts) = filter' isSingle $ map flatten (scc graph)
 
+terminals :: [Integer]
 terminals = map (second . nodeFromVertex . head) ts
+isTerminal' :: Integer -> Bool
 
 isTerminal' x = x `elem` terminals
 
 second :: (a, b, c) -> b
+nonTerminals :: [Integer]
 second (_, x, _) = x
 
 nonTerminals = map (second . nodeFromVertex) (concat nts)
@@ -121,76 +123,84 @@ filter' f (x : xs)
   <recursiveTerm> ::= <recursiveTerm1> | <recursiveTerm2>
 -}
 
-newtype Sym = Sym Symbol
+newtype Sym = Sym String
   deriving (Show, Ord, Eq)
 
 data Expr = Choices [Sym] | Seqs [Sym] | Term String
   deriving (Show, Ord, Eq)
 
-type Symbol = String
-
-data Rule = Rule Symbol Expr
+data Rule = Rule Sym Expr
   deriving (Show, Ord, Eq)
 
-singleTerm = Rule "singleTerm" (Term "[singleTerm]")
+singleTerm :: Rule
+singleTerm = Rule (Sym "singleTerm") (Term "[singleTerm]")
 
-seqTerm1 = Rule "seqTerm1" (Term "[seqTerm1]")
+seqTerm1 :: Rule
+seqTerm1 = Rule (Sym "seqTerm1") (Term "[seqTerm1]")
+seqTerm2 :: Rule
 
-seqTerm2 = Rule "seqTerm2" (Term "[seqTerm2]")
+seqTerm :: Rule
+seqTerm2 = Rule (Sym "seqTerm2") (Term "[seqTerm2]")
 
-seqTerm = Rule "seqTerm" $ Seqs [Sym "seqTerm1", Sym "seqTerm2"]
+seqTerm = Rule (Sym "seqTerm") $ Seqs [Sym "seqTerm1", Sym "seqTerm2"]
 
-choicesTerm1 = Rule "choicesTerm1" (Term "[choicesTerm1]")
+choicesTerm1 :: Rule
+choicesTerm1 = Rule (Sym "choicesTerm1") (Term "[choicesTerm1]")
 
-choicesTerm2 = Rule "choicesTerm2" (Term "[choicesTerm2]")
+choicesTerm2 :: Rule
+choicesTerm2 = Rule (Sym "choicesTerm2") (Term "[choicesTerm2]")
 
-choicesTerm = Rule "choicesTerm" $ Choices [Sym "choicesTerm1", Sym "choicesTerm2"]
+choicesTerm :: Rule
+choicesTerm = Rule (Sym "choicesTerm") $ Choices [Sym "choicesTerm1", Sym "choicesTerm2"]
 
-recursiveTerm1' = Rule "recursiveTerm1'" (Term "[recursiveTerm1]")
+recursiveTerm1' :: Rule
+recursiveTerm1' = Rule (Sym "recursiveTerm1'") (Term "[recursiveTerm1]")
 
-recursiveTerm2' = Rule "recursiveTerm2'" (Term "[recursiveTerm2]")
+recursiveTerm2' :: Rule
+recursiveTerm2' = Rule (Sym "recursiveTerm2'") (Term "[recursiveTerm2]")
 
-recursiveTerm = Rule "recursiveTerm" $ Choices [Sym "recursiveTerm1", Sym "recursiveTerm2"]
+recursiveTerm :: Rule
+recursiveTerm = Rule (Sym "recursiveTerm") $ Choices [Sym "recursiveTerm1", Sym "recursiveTerm2"]
 
-recursiveTerm1 = Rule "recursiveTerm1" (Choices [Sym "recursiveTerm", Sym "recursiveTerm1'"])
+recursiveTerm1 :: Rule
+recursiveTerm1 = Rule (Sym "recursiveTerm1") (Choices [Sym "recursiveTerm", Sym "recursiveTerm1'"])
 
-recursiveTerm2 = Rule "recursiveTerm2" (Choices [Sym "recursiveTerm", Sym "recursiveTerm2'"])
+recursiveTerm2 :: Rule
+recursiveTerm2 = Rule (Sym "recursiveTerm2") (Choices [Sym "recursiveTerm", Sym "recursiveTerm2'"])
 
 
 compile :: [Rule] -> [(BNF, Integer, [Integer])]
-compile rs = zip3 bs is es
+compile rs = zip3 bs is es''
   where
     m = assignIds rs
     bs :: [BNF] = map compileExpr rs
-    es :: [[Integer]] = map (`compileEdge` m) rs
+    es'' :: [[Integer]] = map (`compileEdge` m) rs
     is :: [Integer] = map (`compileId` m) rs
 
 inverseMap :: [(BNF, Integer, [Integer])] -> Map Integer BNF'
 inverseMap = fromList . map (\(b, i, xs) -> (i, (b, i, xs)))
 
-assignIds :: [Rule] -> Map Symbol Integer
+assignIds :: [Rule] -> Map Sym Integer
 assignIds rs = fromList $ zip (map symbol rs) [0 ..]
 
-symbol :: Rule -> Symbol
+symbol :: Rule -> Sym
 symbol (Rule s _) = s
 
 compileExpr :: Rule -> BNF
-compileExpr (Rule _ (Choices _)) = BChoices
-compileExpr (Rule _ (Seqs _)) = BSeqs
-compileExpr (Rule _ (Term s)) = BTerm s
+compileExpr (Rule sym (Choices _)) = BChoices sym
+compileExpr (Rule sym (Seqs _)) = BSeqs sym
+compileExpr (Rule sym (Term s)) = BTerm s sym
 
-compileEdge :: Rule -> Map Symbol Integer -> [Integer]
+compileEdge :: Rule -> Map Sym Integer -> [Integer]
 compileEdge (Rule _ expr) m = map (m !) (flattenExpr expr)
 
-flattenExpr :: Expr -> [Symbol]
-flattenExpr (Seqs ss) = map flattenSym ss
-flattenExpr (Choices cs) = map flattenSym cs
-flattenExpr (Term s) = []
+flattenExpr :: Expr -> [Sym]
+flattenExpr (Seqs ss) = ss
+flattenExpr (Choices cs) = cs
+flattenExpr (Term _) = []
 
-flattenSym :: Sym -> Symbol
-flattenSym (Sym s) = s
 
-compileId :: Rule -> Map Symbol Integer -> Integer
+compileId :: Rule -> Map Sym Integer -> Integer
 compileId (Rule s _) m = m ! s
 
 newtype FTerm = FTerm String
@@ -200,37 +210,59 @@ instance Show FTerm where
 
 newtype FSeq = FSeq [FTerm]
 
+data Res = RTerm String Sym | RSeq Sym | RChoices Sym
+  deriving (Show)
+
+-- need this newtype wrapper for a custom show instance
+newtype TRes = TRes (Tree Res)
+
+instance Show TRes where
+  show (TRes t) = showTree t
+
+showTree :: Tree Res -> String
+showTree (Node (RTerm s _) _) = s
+showTree (Node (RSeq _) ts) = concatMap showTree ts
+showTree (Node (RChoices _) cs) = concatMap showTree cs
+
 instance Show FSeq where
   show (FSeq fs) = concatMap show fs
 
 concatF :: [FSeq] -> FSeq
 concatF = FSeq . concatMap (\(FSeq fs) -> fs)
 
-gen :: BNF' -> Map Integer BNF' -> Int -> Gen FSeq
-gen (BTerm s, _, _) _ _ = return $ FSeq [FTerm s]
-gen (BSeqs, x, xs) m i = do
+unwrap :: TRes -> Tree Res
+unwrap (TRes t) = t
+
+
+gen :: BNF' -> Map Integer BNF' -> Int -> Gen TRes
+gen (BTerm s sym, _, _) _ _ = return $ TRes $ Node (RTerm s sym) []
+gen (BSeqs sym, _, xs) m i = do
   fs <- mapM (\x' -> gen (m ! x') m (i - 1)) xs
-  return $ concatF fs
-gen (BChoices, x, xs) m i
+  return $ TRes (Node (RSeq sym) (map unwrap fs))
+gen (BChoices sym, _, xs) m i
   | i < 1 = do
-    let ts = filter isTerminal' xs
-    case ts of 
+    let ts' = filter isTerminal' xs
+    case ts' of 
       [] -> do
         t <- elements xs
-        gen (m ! t) m (i - 1)
+        res <- gen (m ! t) m (i - 1)
+        return $ TRes $ Node (RChoices sym) [unwrap res]
       _ -> do
-        t <- elements ts
-        gen (m ! t) m (i - 1)
+        t <- elements ts'
+        res <- gen (m ! t) m (i - 1)
+        return $ TRes $ Node (RChoices sym) [unwrap res]
 
   | otherwise = do
     j <- elements xs
-    gen (m ! j) m (i - 1)
+    res <- gen (m ! j) m (i - 1)
+    return $ TRes $ Node (RChoices sym) [unwrap res]
 
-gen' :: [BNF'] -> Int -> Gen FSeq
+gen' :: [BNF'] -> Int -> Gen TRes
 gen' bs i = do
   j <- elements bs
   gen j ms i
 
+g' :: Int -> IO ()
 g' x = sample $ gen' es x
 
 rules :: [Rule]
@@ -249,7 +281,9 @@ rules =
   , recursiveTerm2
   ]
 
+es' :: [(BNF, Integer, [Integer])]
 es' = compile rules
 
+ms' :: Map Integer BNF'
 ms' = inverseMap es'
 
