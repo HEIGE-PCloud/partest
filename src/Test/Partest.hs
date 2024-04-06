@@ -203,42 +203,20 @@ flattenExpr (Term _) = []
 compileId :: Rule -> Map Sym Integer -> Integer
 compileId (Rule s _) m = m ! s
 
-newtype FTerm = FTerm String
-
-instance Show FTerm where
-  show (FTerm s) = s
-
-newtype FSeq = FSeq [FTerm]
-
 data Res = RTerm String Sym | RSeq Sym | RChoices Sym
   deriving (Show)
 
--- need this newtype wrapper for a custom show instance
-newtype TRes = TRes (Tree Res)
-
-instance Show TRes where
-  show (TRes t) = showTree t
-
 showTree :: Tree Res -> String
 showTree (Node (RTerm s _) _) = s
-showTree (Node (RSeq _) ts) = concatMap showTree ts
+showTree (Node (RSeq _) ts') = concatMap showTree ts'
 showTree (Node (RChoices _) cs) = concatMap showTree cs
 
-instance Show FSeq where
-  show (FSeq fs) = concatMap show fs
 
-concatF :: [FSeq] -> FSeq
-concatF = FSeq . concatMap (\(FSeq fs) -> fs)
-
-unwrap :: TRes -> Tree Res
-unwrap (TRes t) = t
-
-
-gen :: BNF' -> Map Integer BNF' -> Int -> Gen TRes
-gen (BTerm s sym, _, _) _ _ = return $ TRes $ Node (RTerm s sym) []
+gen :: BNF' -> Map Integer BNF' -> Int -> Gen (Tree Res)
+gen (BTerm s sym, _, _) _ _ = return $ Node (RTerm s sym) []
 gen (BSeqs sym, _, xs) m i = do
   fs <- mapM (\x' -> gen (m ! x') m (i - 1)) xs
-  return $ TRes (Node (RSeq sym) (map unwrap fs))
+  return (Node (RSeq sym) fs)
 gen (BChoices sym, _, xs) m depth
   | depth < 1 = do
     let ts' = filter isTerminal' xs
@@ -247,20 +225,22 @@ gen (BChoices sym, _, xs) m depth
       _ -> gen' ts'
   | otherwise = gen' xs
   where
-    gen' :: [Integer] -> Gen TRes
+    gen' :: [Integer] -> Gen (Tree Res)
     gen' xss = do
       j <- elements xss
       res <- gen (m ! j) m (depth - 1)
-      return $ TRes $ Node (RChoices sym) [unwrap res]
+      return $ Node (RChoices sym) [res]
 
 
-genAll :: [BNF'] -> Int -> Gen TRes
+genAll :: [BNF'] -> Int -> Gen (Tree Res)
 genAll bs i = do
   j <- elements bs
   gen j ms i
 
 g' :: Int -> IO ()
-g' x = sample $ genAll es x
+g' x = do 
+  xs <- sample' $ genAll es x
+  mapM_ (putStrLn . showTree) xs
 
 rules :: [Rule]
 rules =
