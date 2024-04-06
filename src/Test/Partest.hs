@@ -239,31 +239,28 @@ gen (BTerm s sym, _, _) _ _ = return $ TRes $ Node (RTerm s sym) []
 gen (BSeqs sym, _, xs) m i = do
   fs <- mapM (\x' -> gen (m ! x') m (i - 1)) xs
   return $ TRes (Node (RSeq sym) (map unwrap fs))
-gen (BChoices sym, _, xs) m i
-  | i < 1 = do
+gen (BChoices sym, _, xs) m depth
+  | depth < 1 = do
     let ts' = filter isTerminal' xs
     case ts' of 
-      [] -> do
-        t <- elements xs
-        res <- gen (m ! t) m (i - 1)
-        return $ TRes $ Node (RChoices sym) [unwrap res]
-      _ -> do
-        t <- elements ts'
-        res <- gen (m ! t) m (i - 1)
-        return $ TRes $ Node (RChoices sym) [unwrap res]
+      [] -> gen' xs
+      _ -> gen' ts'
+  | otherwise = gen' xs
+  where
+    gen' :: [Integer] -> Gen TRes
+    gen' xss = do
+      j <- elements xss
+      res <- gen (m ! j) m (depth - 1)
+      return $ TRes $ Node (RChoices sym) [unwrap res]
 
-  | otherwise = do
-    j <- elements xs
-    res <- gen (m ! j) m (i - 1)
-    return $ TRes $ Node (RChoices sym) [unwrap res]
 
-gen' :: [BNF'] -> Int -> Gen TRes
-gen' bs i = do
+genAll :: [BNF'] -> Int -> Gen TRes
+genAll bs i = do
   j <- elements bs
   gen j ms i
 
 g' :: Int -> IO ()
-g' x = sample $ gen' es x
+g' x = sample $ genAll es x
 
 rules :: [Rule]
 rules =
