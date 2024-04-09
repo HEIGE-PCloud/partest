@@ -39,6 +39,7 @@ library
     , base >=4.7 && <5
     , containers
     , gigaparsec ==0.2.*
+    , mtl
   default-language: Haskell2010
 
 executable partest-exe
@@ -53,6 +54,7 @@ executable partest-exe
     , base >=4.7 && <5
     , containers
     , gigaparsec ==0.2.*
+    , mtl
     , partest
   default-language: Haskell2010
 
@@ -69,5 +71,6 @@ test-suite partest-test
     , base >=4.7 && <5
     , containers
     , gigaparsec ==0.2.*
+    , mtl
     , partest
   default-language: Haskell2010

@@ -24,6 +24,7 @@ dependencies:
 - QuickCheck
 - containers
 - gigaparsec >= 0.2 && < 0.3
+- mtl
 
 ghc-options:
 - -Wall
