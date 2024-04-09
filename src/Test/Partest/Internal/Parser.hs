@@ -70,12 +70,16 @@ symbol =
           , '~'
           ]
 
+character1 :: Parsec Char
 character1 = character <|> char '\''
 
+character2 :: Parsec Char
 character2 = character <|> char '"'
 
+ruleName :: Parsec Char
 ruleName = letter <|> ruleName
 
+ruleChar :: Parsec Char
 ruleChar = letter <|> digit <|> char '-'
 
 data PTerm = PStr String | PSym String
@@ -103,5 +107,6 @@ pPairType = PChoices "pairType" (PSeqs (PStr "pair" <| PStr "(" <| PSym "pairEle
 pPairElemType :: PChoices
 pPairElemType = PChoices "pairElemType" (sym "baseType" <| sym "arrayType" <| str "pair" :| [])
 
+pRules :: PRules
 pRules = PRules (pType <| pBaseType <| pArrayType <| pPairType <| pPairElemType :| [])
 -- pRules = PRules (pType :| [])

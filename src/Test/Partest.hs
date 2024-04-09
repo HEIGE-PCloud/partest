@@ -4,6 +4,7 @@ module Test.Partest where
 
 import Control.Monad.State
 import Data.Graph
+import Data.List.Extra (concatUnzip)
 import Data.List.NonEmpty (NonEmpty ((:|)), singleton, toList)
 import Data.Map (Map, fromList, (!))
 import Data.Tree (flatten)
@@ -134,11 +135,11 @@ recursiveTerm2 =
     Defined
 
 compileNodes :: [Rule] -> [(GRule, Integer, [Integer])]
-compileNodes rs = zip3 bs is es''
+compileNodes rs = zip3 bs is es'''
   where
     m = assignIds rs
     bs :: [GRule] = map compileExpr rs
-    es'' :: [[Integer]] = map (`compileEdge` m) rs
+    es''' :: [[Integer]] = map (`compileEdge` m) rs
     is :: [Integer] = map (`compileId` m) rs
 
 inverseMap :: [(GRule, Integer, [Integer])] -> Map Integer GRuleNode
@@ -183,7 +184,7 @@ gen
   :: GRuleNode -> (Integer -> Bool) -> Map Integer GRuleNode -> Int -> Gen (Tree Res)
 gen (GTerm s sym, _, _) _ _ _ = return $ Node (RTerm s sym) []
 gen (GSeqs sym, _, xs) isTerminal m i = do
-  fs <- mapM (\x' -> gen (m ! x') isTerminal m (i - 1)) xs
+  fs <- mapM (\x' -> gen (m ! x') isTerminal m i) xs
   return (Node (RSeq sym) fs)
 gen (GChoices sym, _, xs) isTerminal m depth
   | depth < 1 = do
@@ -318,7 +319,7 @@ defined (Rule _ _ Defined) = True
 defined _ = False
 
 es'' :: [(GRule, Integer, [Integer])]
-es'' = compileNodes r4 -- rules'
+es'' = compileNodes r2 -- rules'
 
 ms'' :: Map Integer GRuleNode
 ms'' = inverseMap es''
@@ -339,7 +340,7 @@ genAll bs i = do
   let isTerminal x = x `elem` terminals
   j <-
     elements
-      (filter (\(_, key :: Integer, _) -> defined (r4 !! fromInteger key)) bs)
+      (filter (\(_, key :: Integer, _) -> defined (r2 !! fromInteger key)) bs)
   gen j isTerminal ms'' i
 
 -- use `g' 10` to sample some examples
@@ -359,52 +360,58 @@ getSym = do
   put (lab + 1)
   return $ Sym ("extractedRule-" ++ show lab)
 
-compilePTerm :: PTerm -> State Integer [Rule]
-compilePTerm (PStr s) = do
-  sym <- getSym
-  return [Rule sym (Term s) Extracted]
--- Bug here: Should not return a new rule, instead, should separate the list of rules and list of syms in the output of the state monad
-compilePTerm (PSym sym) = return [Rule (Sym sym) (Term sym) Extracted]
+type Output = ([Rule], [Sym])
 
-compilePTerms :: NonEmpty PTerm -> State Integer [Rule]
-compilePTerms (pt :| []) = compilePTerm pt
-compilePTerms ts = do
-  rootSym <- getSym
-  ts' <- mapM compilePTerm (toList ts)
-  let ts'' = concat ts'
-  let newSyms = map symbol ts''
-  let rootRule = Rule rootSym (Seqs newSyms) Extracted
-  return $ rootRule : ts''
+compilePTerm :: Maybe Sym -> PTerm -> State Integer Output
+compilePTerm sy (PStr s) = do
+  sym <- getSym' sy
+  return ([Rule sym (Term s) Extracted], [sym])
+compilePTerm _ (PSym sym) = return ([], [Sym sym])
 
-compilePRules :: PRules -> State Integer [Rule]
+getSym' :: Maybe Sym -> State Integer Sym
+getSym' (Just s) = return s
+getSym' Nothing = getSym
+
+compilePTerms :: Maybe Sym -> NonEmpty PTerm -> State Integer Output
+compilePTerms s (pt :| []) = compilePTerm s pt
+compilePTerms s ts = do
+  rootSym <- getSym' s
+  ts' <- mapM (compilePTerm Nothing) (toList ts)
+  let (rs, ss) = concatUnzip ts'
+  let rootRule = Rule rootSym (Seqs ss) Extracted
+  return (rootRule : rs, rootSym : ss)
+
+compilePRules :: PRules -> State Integer Output
 compilePRules (PRules rs) = do
   rs' <- mapM compilePChoices rs
-  return $ concat (toList rs')
+  return $ concatUnzip (toList rs')
 
-compilePChoices :: PChoices -> State Integer [Rule]
-compilePChoices (PChoices _ (ss :| [])) = do
-  -- bug here, if there is only one seq inside PChoices, should wrap it around a Seqs
-  compilePSeqs ss
+compilePChoices :: PChoices -> State Integer Output
+compilePChoices (PChoices s (ss :| [])) = do
+  compilePSeqs (Just (Sym s)) ss
 compilePChoices (PChoices sym cs) = do
-  cc' <- mapM compilePSeqs (toList cs)
-  let ccs' = concat cc'
-  let newSyms = map symbol ccs'
-  let rootRule = Rule (Sym sym) (Choices newSyms) Defined
-  return $ rootRule : ccs'
+  cc' <- mapM (compilePSeqs Nothing) (toList cs)
+  let (rs, ss) = concatUnzip cc'
+  let newSym = Sym sym
+  let rootRule = Rule newSym (Choices ss) Defined
+  return (rootRule : rs, newSym : ss)
 
-compilePSeqs :: PSeqs -> State Integer [Rule]
-compilePSeqs (PSeqs ts) = compilePTerms ts
+compilePSeqs :: Maybe Sym -> PSeqs -> State Integer Output
+compilePSeqs s (PSeqs ts) = compilePTerms s ts
 
+r1 :: State Integer Output
 r1 = compilePRules pRules
 
-(r2, r3) = runState r1 0
+r2 :: [Rule]
+r3 :: Integer
+((r2, _), r3) = runState r1 0
 
+r4 :: [Rule]
 r4 =
   [ Rule
       (Sym "type")
       (Choices [Sym "baseType", Sym "arrayType", Sym "pairType"])
       Defined
-
   , Rule
       (Sym "baseType")
       ( Choices
@@ -419,14 +426,12 @@ r4 =
   , Rule (Sym "extractedRule-1") (Term "bool") Extracted
   , Rule (Sym "extractedRule-2") (Term "char") Extracted
   , Rule (Sym "extractedRule-3") (Term "string") Extracted
-
   , Rule
       (Sym "arrayType")
       (Seqs [Sym "type", Sym "extractedRule-5", Sym "extractedRule-6"])
       Defined
   , Rule (Sym "extractedRule-5") (Term "[") Extracted
   , Rule (Sym "extractedRule-6") (Term "]") Extracted
-
   , Rule
       (Sym "pairType")
       ( Seqs
@@ -443,12 +448,58 @@ r4 =
   , Rule (Sym "extractedRule-9") (Term "(") Extracted
   , Rule (Sym "extractedRule-10") (Term ",") Extracted
   , Rule (Sym "extractedRule-11") (Term ")") Extracted
-
   , Rule
       (Sym "pairElemType")
       (Choices [Sym "baseType", Sym "arrayType", Sym "extractedRule-12"])
       Defined
-
   , Rule (Sym "extractedRule-12") (Term "pair") Extracted
   ]
 
+r5 :: [Rule]
+r5 =
+  [ Rule
+      (Sym "type")
+      (Choices [Sym "baseType", Sym "arrayType", Sym "pairType"])
+      Defined
+  , Rule
+      (Sym "baseType")
+      ( Choices
+          [ Sym "extractedRule-0"
+          , Sym "extractedRule-1"
+          , Sym "extractedRule-2"
+          , Sym "extractedRule-3"
+          ]
+      )
+      Defined
+  , Rule (Sym "extractedRule-0") (Term "int") Extracted
+  , Rule (Sym "extractedRule-1") (Term "bool") Extracted
+  , Rule (Sym "extractedRule-2") (Term "char") Extracted
+  , Rule (Sym "extractedRule-3") (Term "string") Extracted
+  , Rule
+      (Sym "arrayType")
+      (Seqs [Sym "type", Sym "extractedRule-4", Sym "extractedRule-5"])
+      Extracted
+  , Rule (Sym "extractedRule-4") (Term "[") Extracted
+  , Rule (Sym "extractedRule-5") (Term "]") Extracted
+  , Rule
+      (Sym "pairType")
+      ( Seqs
+          [ Sym "extractedRule-6"
+          , Sym "extractedRule-7"
+          , Sym "pairElemType"
+          , Sym "extractedRule-8"
+          , Sym "pairElemType"
+          , Sym "extractedRule-9"
+          ]
+      )
+      Extracted
+  , Rule (Sym "extractedRule-6") (Term "pair") Extracted
+  , Rule (Sym "extractedRule-7") (Term "(") Extracted
+  , Rule (Sym "extractedRule-8") (Term ",") Extracted
+  , Rule (Sym "extractedRule-9") (Term ")") Extracted
+  , Rule
+      (Sym "pairElemType")
+      (Choices [Sym "baseType", Sym "arrayType", Sym "extractedRule-10"])
+      Defined
+  , Rule (Sym "extractedRule-10") (Term "pair") Extracted
+  ]
