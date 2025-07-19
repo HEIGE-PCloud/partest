@@ -41,6 +41,8 @@ ghc-options:
 library:
   source-dirs: src
 
+language: GHC2024
+
 executables:
   partest-exe:
     main:                Main.hs
