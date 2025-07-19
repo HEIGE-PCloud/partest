@@ -9,11 +9,11 @@ import Data.List.NonEmpty (NonEmpty ((:|)), singleton, toList)
 import Data.Map (Map, fromList, (!))
 import Data.Tree (flatten)
 import Test.Partest.Internal.Parser
-  ( PChoices (..)
-  , PRules (..)
-  , PSeqs (..)
-  , PTerm (..)
-  , pRules
+  ( PChoices (..),
+    PRules (..),
+    PSeqs (..),
+    PTerm (..),
+    pRules,
   )
 import Test.QuickCheck
 
@@ -23,6 +23,13 @@ data GRule = GChoices Sym | GSeqs Sym | GTerm String Sym
 
 type GRuleNode = (GRule, Integer, [Integer])
 
+-- TODO: record distance to terminal nodes in each node, and during generation
+-- select a node with the smallest distance to terminal nodes when the depth is
+-- exhausted.
+-- (GRule, Integer, [Integer]) is a node in the graph where the integer is
+-- its ID and the list of integers are the nodes it points to.
+-- TODO: construct a larger test case with 
+-- https://github.com/codelion/gramtest/issues/16
 -- graph :: Graph
 -- nodeFromVertex :: Vertex -> (GRule, Integer, [Integer])
 -- vertexFromKey :: Integer -> Maybe Vertex
@@ -159,9 +166,9 @@ compileExpr (Rule sym (Term s) _) = GTerm s sym
 compileEdge :: Rule -> Map Sym Integer -> [Integer]
 compileEdge (Rule _ expr _) m = map (m !) (flattenExpr expr)
 
-compileGraph
-  :: [(GRule, Integer, [Integer])]
-  -> (Graph, Vertex -> (GRule, Integer, [Integer]), Integer -> Maybe Vertex)
+compileGraph ::
+  [(GRule, Integer, [Integer])] ->
+  (Graph, Vertex -> (GRule, Integer, [Integer]), Integer -> Maybe Vertex)
 compileGraph = graphFromEdges
 
 flattenExpr :: Expr -> [Sym]
@@ -180,8 +187,8 @@ showTree (Node (RTerm s _) _) = s
 showTree (Node (RSeq _) ts') = concatMap showTree ts'
 showTree (Node (RChoices _) cs) = concatMap showTree cs
 
-gen
-  :: GRuleNode -> (Integer -> Bool) -> Map Integer GRuleNode -> Int -> Gen (Tree Res)
+gen ::
+  GRuleNode -> (Integer -> Bool) -> Map Integer GRuleNode -> Int -> Gen (Tree Res)
 gen (GTerm s sym, _, _) _ _ _ = return $ Node (RTerm s sym) []
 gen (GSeqs sym, _, xs) isTerminal m i = do
   fs <- mapM (\x' -> gen (m ! x') isTerminal m i) xs
@@ -202,18 +209,18 @@ gen (GChoices sym, _, xs) isTerminal m depth
 
 rules :: [Rule]
 rules =
-  [ singleTerm
-  , seqTerm1
-  , seqTerm2
-  , seqTerm
-  , choicesTerm1
-  , choicesTerm2
-  , choicesTerm
-  , recursiveTerm1'
-  , recursiveTerm2'
-  , recursiveTerm
-  , recursiveTerm1
-  , recursiveTerm2
+  [ singleTerm,
+    seqTerm1,
+    seqTerm2,
+    seqTerm,
+    choicesTerm1,
+    choicesTerm2,
+    choicesTerm,
+    recursiveTerm1',
+    recursiveTerm2',
+    recursiveTerm,
+    recursiveTerm1,
+    recursiveTerm2
   ]
 
 es' :: [(GRule, Integer, [Integer])]
@@ -278,12 +285,12 @@ pairType =
   Rule
     (Sym "pairType")
     ( Seqs
-        [ Sym "pair"
-        , Sym "leftParam"
-        , Sym "pairElemType"
-        , Sym "comma"
-        , Sym "pairElemType"
-        , Sym "rightParam"
+        [ Sym "pair",
+          Sym "leftParam",
+          Sym "pairElemType",
+          Sym "comma",
+          Sym "pairElemType",
+          Sym "rightParam"
         ]
     )
     Defined
@@ -297,21 +304,21 @@ pairElemType =
 
 rules' :: [Rule]
 rules' =
-  [ int
-  , bool
-  , char
-  , string
-  , baseType
-  , pair
-  , leftParam
-  , comma
-  , rightParam
-  , leftSquareBracket
-  , rightSquareBracket
-  , ttype
-  , arrayType
-  , pairType
-  , pairElemType
+  [ int,
+    bool,
+    char,
+    string,
+    baseType,
+    pair,
+    leftParam,
+    comma,
+    rightParam,
+    leftSquareBracket,
+    rightSquareBracket,
+    ttype,
+    arrayType,
+    pairType,
+    pairElemType
   ]
 
 defined :: Rule -> Bool
@@ -411,48 +418,48 @@ r4 =
   [ Rule
       (Sym "type")
       (Choices [Sym "baseType", Sym "arrayType", Sym "pairType"])
-      Defined
-  , Rule
+      Defined,
+    Rule
       (Sym "baseType")
       ( Choices
-          [ Sym "extractedRule-0"
-          , Sym "extractedRule-1"
-          , Sym "extractedRule-2"
-          , Sym "extractedRule-3"
+          [ Sym "extractedRule-0",
+            Sym "extractedRule-1",
+            Sym "extractedRule-2",
+            Sym "extractedRule-3"
           ]
       )
-      Defined
-  , Rule (Sym "extractedRule-0") (Term "int") Extracted
-  , Rule (Sym "extractedRule-1") (Term "bool") Extracted
-  , Rule (Sym "extractedRule-2") (Term "char") Extracted
-  , Rule (Sym "extractedRule-3") (Term "string") Extracted
-  , Rule
+      Defined,
+    Rule (Sym "extractedRule-0") (Term "int") Extracted,
+    Rule (Sym "extractedRule-1") (Term "bool") Extracted,
+    Rule (Sym "extractedRule-2") (Term "char") Extracted,
+    Rule (Sym "extractedRule-3") (Term "string") Extracted,
+    Rule
       (Sym "arrayType")
       (Seqs [Sym "type", Sym "extractedRule-5", Sym "extractedRule-6"])
-      Defined
-  , Rule (Sym "extractedRule-5") (Term "[") Extracted
-  , Rule (Sym "extractedRule-6") (Term "]") Extracted
-  , Rule
+      Defined,
+    Rule (Sym "extractedRule-5") (Term "[") Extracted,
+    Rule (Sym "extractedRule-6") (Term "]") Extracted,
+    Rule
       (Sym "pairType")
       ( Seqs
-          [ Sym "extractedRule-8"
-          , Sym "extractedRule-9"
-          , Sym "pairElemType"
-          , Sym "extractedRule-10"
-          , Sym "pairElemType"
-          , Sym "extractedRule-11"
+          [ Sym "extractedRule-8",
+            Sym "extractedRule-9",
+            Sym "pairElemType",
+            Sym "extractedRule-10",
+            Sym "pairElemType",
+            Sym "extractedRule-11"
           ]
       )
-      Defined
-  , Rule (Sym "extractedRule-8") (Term "pair") Extracted
-  , Rule (Sym "extractedRule-9") (Term "(") Extracted
-  , Rule (Sym "extractedRule-10") (Term ",") Extracted
-  , Rule (Sym "extractedRule-11") (Term ")") Extracted
-  , Rule
+      Defined,
+    Rule (Sym "extractedRule-8") (Term "pair") Extracted,
+    Rule (Sym "extractedRule-9") (Term "(") Extracted,
+    Rule (Sym "extractedRule-10") (Term ",") Extracted,
+    Rule (Sym "extractedRule-11") (Term ")") Extracted,
+    Rule
       (Sym "pairElemType")
       (Choices [Sym "baseType", Sym "arrayType", Sym "extractedRule-12"])
-      Defined
-  , Rule (Sym "extractedRule-12") (Term "pair") Extracted
+      Defined,
+    Rule (Sym "extractedRule-12") (Term "pair") Extracted
   ]
 
 r5 :: [Rule]
@@ -460,46 +467,46 @@ r5 =
   [ Rule
       (Sym "type")
       (Choices [Sym "baseType", Sym "arrayType", Sym "pairType"])
-      Defined
-  , Rule
+      Defined,
+    Rule
       (Sym "baseType")
       ( Choices
-          [ Sym "extractedRule-0"
-          , Sym "extractedRule-1"
-          , Sym "extractedRule-2"
-          , Sym "extractedRule-3"
+          [ Sym "extractedRule-0",
+            Sym "extractedRule-1",
+            Sym "extractedRule-2",
+            Sym "extractedRule-3"
           ]
       )
-      Defined
-  , Rule (Sym "extractedRule-0") (Term "int") Extracted
-  , Rule (Sym "extractedRule-1") (Term "bool") Extracted
-  , Rule (Sym "extractedRule-2") (Term "char") Extracted
-  , Rule (Sym "extractedRule-3") (Term "string") Extracted
-  , Rule
+      Defined,
+    Rule (Sym "extractedRule-0") (Term "int") Extracted,
+    Rule (Sym "extractedRule-1") (Term "bool") Extracted,
+    Rule (Sym "extractedRule-2") (Term "char") Extracted,
+    Rule (Sym "extractedRule-3") (Term "string") Extracted,
+    Rule
       (Sym "arrayType")
       (Seqs [Sym "type", Sym "extractedRule-4", Sym "extractedRule-5"])
-      Extracted
-  , Rule (Sym "extractedRule-4") (Term "[") Extracted
-  , Rule (Sym "extractedRule-5") (Term "]") Extracted
-  , Rule
+      Extracted,
+    Rule (Sym "extractedRule-4") (Term "[") Extracted,
+    Rule (Sym "extractedRule-5") (Term "]") Extracted,
+    Rule
       (Sym "pairType")
       ( Seqs
-          [ Sym "extractedRule-6"
-          , Sym "extractedRule-7"
-          , Sym "pairElemType"
-          , Sym "extractedRule-8"
-          , Sym "pairElemType"
-          , Sym "extractedRule-9"
+          [ Sym "extractedRule-6",
+            Sym "extractedRule-7",
+            Sym "pairElemType",
+            Sym "extractedRule-8",
+            Sym "pairElemType",
+            Sym "extractedRule-9"
           ]
       )
-      Extracted
-  , Rule (Sym "extractedRule-6") (Term "pair") Extracted
-  , Rule (Sym "extractedRule-7") (Term "(") Extracted
-  , Rule (Sym "extractedRule-8") (Term ",") Extracted
-  , Rule (Sym "extractedRule-9") (Term ")") Extracted
-  , Rule
+      Extracted,
+    Rule (Sym "extractedRule-6") (Term "pair") Extracted,
+    Rule (Sym "extractedRule-7") (Term "(") Extracted,
+    Rule (Sym "extractedRule-8") (Term ",") Extracted,
+    Rule (Sym "extractedRule-9") (Term ")") Extracted,
+    Rule
       (Sym "pairElemType")
       (Choices [Sym "baseType", Sym "arrayType", Sym "extractedRule-10"])
-      Defined
-  , Rule (Sym "extractedRule-10") (Term "pair") Extracted
+      Defined,
+    Rule (Sym "extractedRule-10") (Term "pair") Extracted
   ]
