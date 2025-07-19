@@ -18,7 +18,7 @@
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2023-01-01.yaml
 resolver:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/13.yaml
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/0.yaml
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -41,8 +41,11 @@ packages:
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 #
 extra-deps:
-  - gigaparsec-0.2.5.1
-
+  - gigaparsec-0.3.1.0
+  - containers-0.6.8@sha256:bb2bec1bbc6b39a7c97cd95e056a5698ec45beb5d8feb6caae12af64e4bd823c,2670
+  - rt-0.1.0.0@sha256:3dbaed11a49993d1440d36b0c6136569a10e6bd2fa2b8280ef590542dd388a2d,2733
+  - text-2.1.2@sha256:2898d240693a61911efc6e9f9dd3f05a1561684b0c42da964b76ae6463dba754,10989
+  - binary-0.8.9.3@sha256:8b03c7fd5a7f6803280fba87e38d534beb1dc92fec975de5bd36200633996ef2,6576
 # Override default flag values for local packages and extra-deps
 # flags: {}
 
